@@ -22,4 +22,4 @@ backend/weights/*
 !backend/weights/SPLICE_MODEL_CARD.md
 !backend/weights/DEEPFAKE_MODEL_CARD.md
 training/sources/*
-!training/sources/.
+!training/sources/.gitkeep
