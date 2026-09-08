@@ -102,22 +102,32 @@ def resolve_root(name: str, spec: str | None) -> Path:
               f"path nor a valid Kaggle handle (owner/slug)")
 
 
-def infer_label(path: Path, force_fake: bool):
-    """Matches keywords against individual words within each path component
-    (splitting on non-alphanumeric chars), not the whole component -- e.g.
-    a folder named "Real faces" or "fake_images" still matches "real"/"fake"
-    as a whole word. Plain substring matching would be too loose here since
-    "ai" is a false-positive substring of many unrelated words (e.g.
-    "training", "explain")."""
+def infer_label(rel_path: Path, force_fake: bool):
+    """Labels from the path BELOW the dataset root, innermost component first.
+
+    Three things this has to get right, each learned from a real dataset:
+
+    - Components are word-split ("Fake faces" -> {"fake", "faces"}) rather than
+      compared whole, because datasets name folders "Real faces", not "real".
+    - Only components below the dataset root are considered. The Kaggle dataset
+      directory is itself often named "real-vs-fake-faces-stylegan3" or
+      "deepfake-and-real-images", which word-splits to contain "real" -- match
+      against the full path and EVERY image in the dataset silently takes
+      whichever class is tested first, Fake/ folder contents included.
+    - Innermost component wins, so a "Fake" leaf folder beats a "real_vs_fake"
+      parent instead of losing to whichever keyword happens to be checked first.
+
+    Substring matching would be looser still: "ai" is a substring of plenty of
+    unrelated words ("training", "explain"), hence whole-word matching.
+    """
     if force_fake:
         return 1
-    words = set()
-    for part in path.parts:
-        words.update(re.split(r"[^a-z0-9]+", part.lower()))
-    if words & REAL_KEYWORDS:
-        return 0
-    if words & FAKE_KEYWORDS:
-        return 1
+    for part in reversed(rel_path.parts):
+        words = set(re.split(r"[^a-z0-9]+", part.lower()))
+        if words & REAL_KEYWORDS:
+            return 0
+        if words & FAKE_KEYWORDS:
+            return 1
     return None
 
 
@@ -160,7 +170,7 @@ def scan_dataset(name: str, root: Path, force_fake: bool):
     for path in root.rglob("*"):
         if path.suffix.lower() not in IMG_EXTS:
             continue
-        label = infer_label(path, force_fake)
+        label = infer_label(path.relative_to(root), force_fake)
         if label is None:
             skipped_unlabeled += 1
             continue

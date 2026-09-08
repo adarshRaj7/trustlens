@@ -197,6 +197,20 @@ def main():
             torch.save(model.state_dict(), OUT_PATH)
             print(f"  -> new best (mean per-source AUC={best_score:.3f}), saved to {OUT_PATH}")
 
+    if best_score < 0:
+        # every epoch's mean-per-source AUC was NaN, so the comparison above
+        # (NaN > x is always False) never saved anything. Fail loudly here
+        # rather than at the torch.load below, whose FileNotFoundError says
+        # nothing about the real cause: a val split where no source has both
+        # classes, i.e. a mislabeled manifest. Check the per-source/label
+        # counts printed by build_deepfake_manifest.py before re-running.
+        raise RuntimeError(
+            "No checkpoint was saved -- mean per-source validation AUC was NaN "
+            "every epoch, meaning no source had both real and fake images in "
+            "the val split. Rebuild the manifest and check its per-source/"
+            "label/split counts before retraining."
+        )
+
     # final honest report on held-out test split, using the BEST checkpoint
     model.load_state_dict(torch.load(OUT_PATH, map_location=device))
     test_report = evaluate(model, test_df, device, args.batch_size, args.num_workers)
