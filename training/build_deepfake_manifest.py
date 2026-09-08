@@ -103,12 +103,20 @@ def resolve_root(name: str, spec: str | None) -> Path:
 
 
 def infer_label(path: Path, force_fake: bool):
+    """Matches keywords against individual words within each path component
+    (splitting on non-alphanumeric chars), not the whole component -- e.g.
+    a folder named "Real faces" or "fake_images" still matches "real"/"fake"
+    as a whole word. Plain substring matching would be too loose here since
+    "ai" is a false-positive substring of many unrelated words (e.g.
+    "training", "explain")."""
     if force_fake:
         return 1
-    parts = {p.lower() for p in path.parts}
-    if parts & REAL_KEYWORDS:
+    words = set()
+    for part in path.parts:
+        words.update(re.split(r"[^a-z0-9]+", part.lower()))
+    if words & REAL_KEYWORDS:
         return 0
-    if parts & FAKE_KEYWORDS:
+    if words & FAKE_KEYWORDS:
         return 1
     return None
 
