@@ -103,9 +103,18 @@ def evaluate(model, df, device, batch_size, num_workers):
     y = np.concatenate(all_y)
     df = df.reset_index(drop=True)
 
+    # A source's score is ITS fakes against the pooled real photos, not that
+    # source's rows in isolation. A --fake-only source (the pure diffusion dump)
+    # holds no reals, so scoring it alone is undefined -- it would report NaN
+    # forever and drop out of checkpoint selection entirely, losing exactly the
+    # generator family we most want measured. Pooling the reals also makes the
+    # numbers comparable: each one answers the same question, "can the model
+    # separate THIS generator's output from a real photo?"
+    is_real = y == 1  # FaceDataset maps class 1 = real
     results = {}
     for source in df["source"].unique():
-        mask = (df["source"] == source).to_numpy()
+        source_fakes = (df["source"] == source).to_numpy() & ~is_real
+        mask = source_fakes | is_real
         try:
             results[source] = roc_auc_score(y[mask], probs[mask])
         except ValueError:
@@ -226,6 +235,9 @@ def main():
                 "fakes are kept per-generator so cross-generator generalization "
                 "can be measured directly instead of inferred from pooled accuracy.\n\n")
         f.write("## Held-out test AUC, by generator family\n\n")
+        f.write("Each generator family is scored as its own fakes against the "
+                "pooled real photos, so the numbers are directly comparable and "
+                "a fake-only source (diffusion) is measurable at all.\n\n")
         for k, v in test_report.items():
             f.write(f"- {k}: {v:.3f}\n")
         f.write("\nSelection criterion during training: best mean-per-source "
