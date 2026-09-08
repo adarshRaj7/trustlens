@@ -133,10 +133,17 @@ def infer_label(rel_path: Path, force_fake: bool):
 
 def content_key(path: Path) -> str:
     """Dedup key: perceptual hash if available (catches the same photo
-    re-compressed by a different dataset mirror), else raw byte hash."""
+    re-compressed by a different dataset mirror), else raw byte hash.
+
+    DCT-based phash, not average_hash: this corpus is aligned, centered face
+    crops that all share one luminance layout, and aHash's 8x8 mean-threshold
+    signature collides across genuinely different people on exactly that kind
+    of homogeneous data. Since dedup keeps the first of each key, a collision
+    silently deletes a distinct face rather than a duplicate one.
+    """
     if HAVE_IMAGEHASH:
         try:
-            return "phash:" + str(imagehash.average_hash(Image.open(path)))
+            return "phash:" + str(imagehash.phash(Image.open(path)))
         except Exception:
             pass
     return "md5:" + hashlib.md5(path.read_bytes()[:65536]).hexdigest()
