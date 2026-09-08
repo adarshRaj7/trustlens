@@ -1,0 +1,25 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.dist/
+build/
+*.egg-info/
+# .env
+# .env.*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+backend/weights/*
+!backend/weights/splice_classifier.pkl
+!backend/weights/SPLICE_MODEL_CARD.md
+!backend/weights/DEEPFAKE_MODEL_CARD.md
+training/sources/*
+!training/sources/.
